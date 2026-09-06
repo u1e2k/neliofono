@@ -59,11 +59,11 @@ class KeyEventHandler(
             KeyEvent.KEYCODE_BUTTON_START -> {
                 PlayerAction.ToggleHelpGuide to "Help Guide (操作説明表示/非表示)"
             }
-            KeyEvent.KEYCODE_BUTTON_X -> {
-                PlayerAction.RawKeyInput(keyCode, "X") to "Button X"
+            KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_R -> {
+                PlayerAction.ToggleRepeatMode to "Repeat Mode (リピート切替: OFF/ALL/1曲)"
             }
-            KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                PlayerAction.RawKeyInput(keyCode, "SELECT") to "SELECT Button"
+            KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_S -> {
+                PlayerAction.ToggleShuffleMode to "Shuffle Mode (シャッフル切替: ON/OFF)"
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
                 PlayerAction.RawKeyInput(keyCode, "DPAD_UP") to "DPad Up"

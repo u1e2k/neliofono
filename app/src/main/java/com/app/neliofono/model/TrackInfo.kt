@@ -45,6 +45,18 @@ data class TrackInfo(
     }
 }
 
+enum class RepeatMode {
+    OFF,
+    ALL,
+    ONE;
+
+    fun next(): RepeatMode = when (this) {
+        OFF -> ALL
+        ALL -> ONE
+        ONE -> OFF
+    }
+}
+
 sealed interface PlayerAction {
     data object PlayPauseToggle : PlayerAction
     data object NextTrack : PlayerAction
@@ -52,6 +64,8 @@ sealed interface PlayerAction {
     data object SwitchViewMode : PlayerAction
     data object ToggleHelpGuide : PlayerAction
     data object DismissOverlayOrBack : PlayerAction
+    data object ToggleRepeatMode : PlayerAction
+    data object ToggleShuffleMode : PlayerAction
     data class RawKeyInput(val keyCode: Int, val keyName: String) : PlayerAction
 }
 

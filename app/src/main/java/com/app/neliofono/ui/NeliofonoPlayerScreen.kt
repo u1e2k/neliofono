@@ -38,6 +38,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
@@ -69,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.app.neliofono.model.PlayerAction
+import com.app.neliofono.model.RepeatMode
 import com.app.neliofono.model.TrackInfo
 import com.app.neliofono.ui.animation.VinylAnimationCoordinator
 import com.app.neliofono.ui.animation.rememberVinylAnimationCoordinator
@@ -226,6 +230,8 @@ private fun SquarePortraitLayout(
 
             PlaybackControlButtons(
                 isPlaying = uiState.isPlaying,
+                repeatMode = uiState.repeatMode,
+                isShuffleEnabled = uiState.isShuffleEnabled,
                 onAction = onAction
             )
         }
@@ -283,6 +289,8 @@ private fun LandscapeLayout(
 
             PlaybackControlButtons(
                 isPlaying = uiState.isPlaying,
+                repeatMode = uiState.repeatMode,
+                isShuffleEnabled = uiState.isShuffleEnabled,
                 onAction = onAction
             )
         }
@@ -510,14 +518,33 @@ fun SeekBarSection(
 @Composable
 fun PlaybackControlButtons(
     isPlaying: Boolean,
+    repeatMode: RepeatMode,
+    isShuffleEnabled: Boolean,
     onAction: (PlayerAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Shuffle Button (SELECT)
+        IconButton(
+            onClick = { onAction(PlayerAction.ToggleShuffleMode) },
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(if (isShuffleEnabled) GoldAccent.copy(alpha = 0.15f) else Color.Transparent)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shuffle,
+                contentDescription = "Shuffle",
+                tint = if (isShuffleEnabled) GoldAccent else TextMuted,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+
+        // Previous Track (L1)
         IconButton(
             onClick = { onAction(PlayerAction.PreviousTrack) },
             modifier = Modifier
@@ -534,8 +561,7 @@ fun PlaybackControlButtons(
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
-
+        // Play / Pause Main Button (A)
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -560,8 +586,7 @@ fun PlaybackControlButtons(
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
-
+        // Next Track (R1)
         IconButton(
             onClick = { onAction(PlayerAction.NextTrack) },
             modifier = Modifier
@@ -575,6 +600,26 @@ fun PlaybackControlButtons(
                 contentDescription = "Next Track",
                 tint = TextPrimary,
                 modifier = Modifier.size(18.dp)
+            )
+        }
+
+        // Repeat Button (X)
+        IconButton(
+            onClick = { onAction(PlayerAction.ToggleRepeatMode) },
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(if (repeatMode != RepeatMode.OFF) GoldAccent.copy(alpha = 0.15f) else Color.Transparent)
+        ) {
+            Icon(
+                imageVector = when (repeatMode) {
+                    RepeatMode.ONE -> Icons.Default.RepeatOne
+                    RepeatMode.ALL -> Icons.Default.Repeat
+                    RepeatMode.OFF -> Icons.Default.Repeat
+                },
+                contentDescription = "Repeat",
+                tint = if (repeatMode != RepeatMode.OFF) GoldAccent else TextMuted,
+                modifier = Modifier.size(19.dp)
             )
         }
     }
@@ -649,6 +694,8 @@ fun HelpGuideModalSheet(
                 KeyBadge(keyLabel = "B", desc = "閉じる / 戻る")
                 KeyBadge(keyLabel = "L1 / ◀", desc = "前の曲")
                 KeyBadge(keyLabel = "R1 / ▶", desc = "次の曲")
+                KeyBadge(keyLabel = "X / R", desc = "リピート (OFF/全/1曲)")
+                KeyBadge(keyLabel = "SELECT / S", desc = "シャッフル")
                 KeyBadge(keyLabel = "Y", desc = "プレイリスト")
                 KeyBadge(keyLabel = "START", desc = "ガイド開閉")
             }

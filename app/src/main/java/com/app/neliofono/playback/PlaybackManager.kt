@@ -6,6 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.app.neliofono.model.RepeatMode
 import com.app.neliofono.model.TrackInfo
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
@@ -36,6 +37,12 @@ class PlaybackManager(
     private val _currentMediaIndex = MutableStateFlow(0)
     val currentMediaIndex: StateFlow<Int> = _currentMediaIndex.asStateFlow()
 
+    private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
+    val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
+
+    private val _isShuffleEnabled = MutableStateFlow(false)
+    val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
@@ -65,6 +72,18 @@ class PlaybackManager(
                 stopPositionTracker()
             }
         }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _repeatMode.value = when (repeatMode) {
+                Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                else -> RepeatMode.OFF
+            }
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            _isShuffleEnabled.value = shuffleModeEnabled
+        }
     }
 
     fun connect() {
@@ -87,6 +106,12 @@ class PlaybackManager(
                     _isPlaying.value = controller.isPlaying
                     _currentMediaIndex.value = controller.currentMediaItemIndex
                     _currentPositionMs.value = controller.currentPosition.coerceAtLeast(0L)
+                    _repeatMode.value = when (controller.repeatMode) {
+                        Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                        Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                        else -> RepeatMode.OFF
+                    }
+                    _isShuffleEnabled.value = controller.shuffleModeEnabled
                     if (controller.isPlaying) {
                         startPositionTracker()
                     }
@@ -125,6 +150,35 @@ class PlaybackManager(
         } else {
             controller.play()
         }
+    }
+
+    fun setRepeatMode(mode: RepeatMode) {
+        val controller = mediaController ?: return
+        val exoMode = when (mode) {
+            RepeatMode.OFF -> Player.REPEAT_MODE_OFF
+            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
+            RepeatMode.ONE -> Player.REPEAT_MODE_ONE
+        }
+        controller.repeatMode = exoMode
+        _repeatMode.value = mode
+    }
+
+    fun cycleRepeatMode(): RepeatMode {
+        val nextMode = _repeatMode.value.next()
+        setRepeatMode(nextMode)
+        return nextMode
+    }
+
+    fun setShuffleModeEnabled(enabled: Boolean) {
+        val controller = mediaController ?: return
+        controller.shuffleModeEnabled = enabled
+        _isShuffleEnabled.value = enabled
+    }
+
+    fun toggleShuffleMode(): Boolean {
+        val nextShuffle = !_isShuffleEnabled.value
+        setShuffleModeEnabled(nextShuffle)
+        return nextShuffle
     }
 
     fun seekToNext() {

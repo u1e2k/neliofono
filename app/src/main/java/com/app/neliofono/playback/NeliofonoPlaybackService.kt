@@ -1,5 +1,6 @@
 package com.app.neliofono.playback
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -7,6 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.app.neliofono.MainActivity
 
 class NeliofonoPlaybackService : MediaSessionService() {
 
@@ -29,7 +31,18 @@ class NeliofonoPlaybackService : MediaSessionService() {
 
         player = exoPlayer
 
+        val sessionActivityIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            sessionActivityIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         mediaSession = MediaSession.Builder(this, exoPlayer)
+            .setSessionActivity(sessionActivityPendingIntent)
             .setCallback(MediaSessionCallback())
             .build()
     }

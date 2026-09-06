@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.app.neliofono.data.AudioScanner
 import com.app.neliofono.model.KeyLogEntry
 import com.app.neliofono.model.PlayerAction
+import com.app.neliofono.model.RepeatMode
 import com.app.neliofono.model.TrackInfo
 import com.app.neliofono.model.VinylPalette
 import com.app.neliofono.playback.PlaybackManager
@@ -25,6 +26,8 @@ data class PlayerUiState(
     val currentIndex: Int = 0,
     val isPlaying: Boolean = false,
     val currentPositionMs: Long = 0L,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    val isShuffleEnabled: Boolean = false,
     val isPlaylistViewOpen: Boolean = false,
     val isHelpModalOpen: Boolean = false,
     val isLocalAudioLoaded: Boolean = false,
@@ -146,6 +149,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
+            playbackManager.repeatMode.collect { mode ->
+                _uiState.update { it.copy(repeatMode = mode) }
+            }
+        }
+
+        viewModelScope.launch {
+            playbackManager.isShuffleEnabled.collect { shuffle ->
+                _uiState.update { it.copy(isShuffleEnabled = shuffle) }
+            }
+        }
+
+        viewModelScope.launch {
             playbackManager.isConnected.collect { connected ->
                 if (connected) {
                     val currentTracks = _uiState.value.playlist
@@ -193,12 +208,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             is PlayerAction.PlayPauseToggle -> togglePlayPause()
             is PlayerAction.NextTrack -> requestNextTrack()
             is PlayerAction.PreviousTrack -> requestPreviousTrack()
+            is PlayerAction.ToggleRepeatMode -> toggleRepeatMode()
+            is PlayerAction.ToggleShuffleMode -> toggleShuffleMode()
             is PlayerAction.SwitchViewMode -> toggleViewMode()
             is PlayerAction.ToggleHelpGuide -> toggleHelpModal()
             is PlayerAction.DismissOverlayOrBack -> dismissOverlay()
             is PlayerAction.RawKeyInput -> {
                 // Key logged in HUD
             }
+        }
+    }
+
+    fun toggleRepeatMode() {
+        if (playbackManager.isConnected.value && _uiState.value.isLocalAudioLoaded) {
+            playbackManager.cycleRepeatMode()
+        } else {
+            _uiState.update { it.copy(repeatMode = it.repeatMode.next()) }
+        }
+    }
+
+    fun toggleShuffleMode() {
+        if (playbackManager.isConnected.value && _uiState.value.isLocalAudioLoaded) {
+            playbackManager.toggleShuffleMode()
+        } else {
+            _uiState.update { it.copy(isShuffleEnabled = !it.isShuffleEnabled) }
         }
     }
 
