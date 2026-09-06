@@ -6,24 +6,38 @@
 
 ---
 
+## 📸 スクリーンショット (Screenshots)
+
+| 再生中 (Playback) | 一時停止中 (Paused) | 操作ガイド (START Modal) |
+|:---:|:---:|:---:|
+| <img src="screenshots/playback.png" width="230" alt="再生中" /> | <img src="screenshots/paused.png" width="230" alt="一時停止中" /> | <img src="screenshots/controls_guide.png" width="230" alt="操作ガイド" /> |
+| **トーンアーム着地 & 60fps回転**<br>Palette連動流線形レコード盤 | **アームレスト退避 & クリーンUI**<br>高級オーディオ機器ライクな佇まい | **STARTボタンで開くガイド**<br>Bボタンで瞬時にクローズ |
+
+---
+
 ## 🌟 特徴 (Features)
 
 1. **RG Rotate 物理キー入力完全対応 (`KeyEventHandler`)**
    - フォーカス状態に依存せず、Activityレベルで直接物理キーイベントをインターセプト。
-   - レコードプレーヤー操作（再生/停止、曲送り/戻し、プレイリスト表示切替）を物理ボタンに完全マッピング。
-   - 押下キーのリアルタイムHUD表示＆Logcat出力。
+   - レコードプレーヤー操作（再生/停止、曲送り/戻し、プレイリスト表示切替、ガイド表示/Bボタンで閉じる）を物理ボタンに完全マッピング。
 
-2. **物理画面回転アダプティブレイアウト (`NeliofonoPlayerScreen`)**
-   - RG Rotateの物理画面回転（縦・横・正方形）に対応。
-   - **縦画面（Portrait）**: 上部に1:1比率のレコード盤、下部に曲情報・シークバー・操作ボタン・キーガイド。
-   - **横画面（Landscape）**: 左側に1:1比率のレコード盤、右側に曲情報・シークバー・操作ボタン・キーガイド。
+2. **リアルなターンテーブル幾何学 & トーンアーム連動 (`TonearmView`)**
+   - 盤外のピボット（支点）から伸びる金属調トーンアーム＆カートリッジ。
+   - **再生中**: 針先（スタイラス光）がレコード盤面の音溝に自然に着地して回転。
+   - **停止中 / 曲切替時**: レコード盤から完全に離れ、右外側のアームレストへスムーズに退避。
 
-3. **リッチなレコード盤ビジュアル & アニメーション (`RecordDiscPlaceholder`)**
-   - レコードの溝（Grooves）、光沢反射（Sheen）、45 RPM センターラベル、スピンドルホールをCompose Canvasで描画。
-   - 再生/一時停止に連動したリアルタイム回転アニメーション。
+3. **アルバムアート連動 動的レコード盤 (`DynamicVinylRecord`)**
+   - アルバムアート・トラック情報から抽出した色彩（Palette API）による流線形スイープグラデーションと溝（Grooves）。
+   - `Modifier.graphicsLayer { rotationZ = ... }` による60fps GPUアクセラレーション回転。
 
-4. **最新のメディア基盤準備**
-   - Jetpack Media3 (ExoPlayer, Session, UI), Palette, Coil, Material 3 などのライブラリを組み込み済み。
+4. **5段階トラック切り替えアニメーション (`VinylAnimationCoordinator`)**
+   - 物理キー（L1/R1、十字左右）および画面左右スワイプで発火。
+   - 「①針退避 ➜ ②レコードスライドアウト ➜ ③曲・パレット色切り替え ➜ ④スプリングスライドイン ➜ ⑤針着地＆スピン再開」がシームレスに連動。
+
+5. **洗練されたクリーンUI & START / B ボタン操作ガイド**
+   - 通常画面は操作説明を非表示にし、高級オーディオ機器のような極上のデザイン。
+   - **STARTボタン** を押すと操作ガイドモーダルをポップアップ表示。
+   - **Bボタン** を押すと、開いている操作ガイドやプレイリストを瞬時にクローズ。
 
 ---
 
@@ -32,10 +46,11 @@
 | ボタン / キー | 動作 (Action) |
 |---|---|
 | **A ボタン** / `MEDIA_PLAY_PAUSE` / `Space` | 再生 / 一時停止 (Play / Pause) |
-| **R1 ボタン** / `DPAD_RIGHT` (十字右) | 次の曲 (Next Track) |
-| **L1 ボタン** / `DPAD_LEFT` (十字左) | 前の曲 (Previous Track) |
-| **Y ボタン** | プレイリスト / ライブラリ切り替え (Toggle Playlist) |
-| **B / X / START / SELECT / DPad** | キー検知ログ（Logcat & リアルタイムHUD）に即時反映 |
+| **B ボタン** / `BACK` / `ESC` | 閉じる / 戻る (Close Modal / Dismiss) |
+| **R1 ボタン** / `DPAD_RIGHT` (十字右) | 次の曲 (Next Track: 針退避＆スライドアニメーション) |
+| **L1 ボタン** / `DPAD_LEFT` (十字左) | 前の曲 (Previous Track: 針退避＆スライドアニメーション) |
+| **Y ボタン** | プレイリスト表示切替 (Toggle Playlist) |
+| **START ボタン** | 操作ガイド表示 / 非表示 (Toggle Controls Guide) |
 
 ---
 
@@ -47,52 +62,3 @@
 - **Media Engine**: AndroidX Media3 (ExoPlayer 1.3.1, MediaSession)
 - **Image & Palette**: Coil 2.6.0, AndroidX Palette 1.0.0
 - **Min SDK**: 26 (Android 8.0 Oreo) / **Target SDK**: 34 (Android 14)
-
----
-
-## 📁 プロジェクト構造
-
-```text
-neliofono/
-├── app/
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── java/com/app/neliofono/
-│       │   ├── MainActivity.kt
-│       │   ├── input/
-│       │   │   └── KeyEventHandler.kt          # RG Rotate物理キー捕捉・ディスパッチ
-│       │   ├── model/
-│       │   │   └── TrackInfo.kt                # データモデル & キーイベント定義
-│       │   ├── ui/
-│       │   │   ├── NeliofonoPlayerScreen.kt    # アダプティブレイアウト画面
-│       │   │   ├── components/
-│       │   │   │   ├── KeyGuideBar.kt          # 物理キーガイド & リアルタイムHUD
-│       │   │   │   └── RecordDiscPlaceholder.kt# 1:1 レコード盤 & 回転描画
-│       │   │   └── theme/
-│       │   │       ├── Color.kt
-│       │   │       ├── Theme.kt
-│       │   │       └── Type.kt
-│       │   └── viewmodel/
-│       │       └── PlayerViewModel.kt          # 再生状態・キーログ管理
-│       └── res/
-│           └── values/
-│               ├── strings.xml
-│               └── themes.xml
-├── gradle/
-│   └── libs.versions.toml
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradle.properties
-├── .gitignore
-└── README.md
-```
-
----
-
-## 🚀 ビルド & 実行方法 (Build & Run)
-
-1. **Android Studio** でプロジェクトフォルダ（`neliofono`）を開きます。
-2. Gradle Sync が完了するのを待ちます。
-3. RG Rotate または Android エミュレータ / 実機を接続し、`app` を実行（Run）します。
-4. キーボードやゲームパッド、画面タッチで操作を確認できます。

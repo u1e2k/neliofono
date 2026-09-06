@@ -50,17 +50,17 @@ class KeyEventHandler(
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_SPACE -> {
                 PlayerAction.PlayPauseToggle to "Play / Pause (再生/一時停止)"
             }
-            KeyEvent.KEYCODE_BUTTON_Y -> {
-                PlayerAction.SwitchViewMode to "Switch View (表示切替)"
+            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                PlayerAction.DismissOverlayOrBack to "Back / Close (戻る/閉じる)"
             }
-            KeyEvent.KEYCODE_BUTTON_B -> {
-                PlayerAction.RawKeyInput(keyCode, "B") to "Button B"
+            KeyEvent.KEYCODE_BUTTON_Y -> {
+                PlayerAction.SwitchViewMode to "Playlist (プレイリスト切替)"
+            }
+            KeyEvent.KEYCODE_BUTTON_START -> {
+                PlayerAction.ToggleHelpGuide to "Help Guide (操作説明表示/非表示)"
             }
             KeyEvent.KEYCODE_BUTTON_X -> {
                 PlayerAction.RawKeyInput(keyCode, "X") to "Button X"
-            }
-            KeyEvent.KEYCODE_BUTTON_START -> {
-                PlayerAction.RawKeyInput(keyCode, "START") to "START Button"
             }
             KeyEvent.KEYCODE_BUTTON_SELECT -> {
                 PlayerAction.RawKeyInput(keyCode, "SELECT") to "SELECT Button"
@@ -96,6 +96,7 @@ class KeyEventHandler(
             KeyEvent.KEYCODE_BUTTON_R2 -> "BUTTON_R2"
             KeyEvent.KEYCODE_BUTTON_START -> "START"
             KeyEvent.KEYCODE_BUTTON_SELECT -> "SELECT"
+            KeyEvent.KEYCODE_BACK -> "BACK"
             KeyEvent.KEYCODE_DPAD_UP -> "DPAD_UP"
             KeyEvent.KEYCODE_DPAD_DOWN -> "DPAD_DOWN"
             KeyEvent.KEYCODE_DPAD_LEFT -> "DPAD_LEFT"
