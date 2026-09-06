@@ -1,6 +1,9 @@
 package com.app.neliofono.model
 
+import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 
 data class VinylPalette(
     val dominant: Color,
@@ -16,13 +19,31 @@ data class TrackInfo(
     val album: String,
     val durationMs: Long,
     val coverUrl: String? = null,
+    val mediaUri: Uri? = null,
     val defaultPalette: VinylPalette = VinylPalette(
         dominant = Color(0xFF9E2A2B),
         vibrant = Color(0xFFE05A47),
         darkVibrant = Color(0xFF540B0E),
         lightMuted = Color(0xFFE5B061)
     )
-)
+) {
+    fun toMediaItem(): MediaItem {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setAlbumTitle(album)
+            .setArtworkUri(coverUrl?.let { Uri.parse(it) })
+            .build()
+
+        val builder = MediaItem.Builder()
+            .setMediaId(id)
+            .setMediaMetadata(metadata)
+
+        mediaUri?.let { builder.setUri(it) }
+
+        return builder.build()
+    }
+}
 
 sealed interface PlayerAction {
     data object PlayPauseToggle : PlayerAction

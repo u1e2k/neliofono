@@ -151,9 +151,7 @@ fun NeliofonoPlayerScreen(
                     uiState = uiState,
                     onClose = { viewModel.toggleViewMode() },
                     onSelectTrack = { idx ->
-                        while (uiState.currentIndex != idx) {
-                            viewModel.applyNextTrack()
-                        }
+                        viewModel.selectTrack(idx)
                     }
                 )
             }
