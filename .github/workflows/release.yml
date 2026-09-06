@@ -1,0 +1,59 @@
+name: Build and Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release Neliofono APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p release-assets
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            APK_NAME="Neliofono-${{ github.ref_name }}.apk"
+          else
+            APK_NAME="Neliofono-debug.apk"
+          fi
+          cp app/build/outputs/apk/debug/app-debug.apk "release-assets/${APK_NAME}"
+          echo "APK_PATH=release-assets/${APK_NAME}" >> $GITHUB_ENV
+          echo "Generated APK: ${APK_NAME}"
+
+      - name: Upload Artifact (for workflow_dispatch or manual inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_PATH }}
+          path: ${{ env.APK_PATH }}
+
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: ${{ env.APK_PATH }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
