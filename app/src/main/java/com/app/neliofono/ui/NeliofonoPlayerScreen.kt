@@ -33,28 +33,43 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -97,7 +112,8 @@ import java.util.Locale
 @Composable
 fun NeliofonoPlayerScreen(
     viewModel: PlayerViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onPickFiles: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -156,6 +172,25 @@ fun NeliofonoPlayerScreen(
                     onClose = { viewModel.toggleViewMode() },
                     onSelectTrack = { idx ->
                         viewModel.selectTrack(idx)
+                    },
+                    onPickFiles = onPickFiles,
+                    onMoveTrack = { from, to ->
+                        viewModel.movePlaylistItem(from, to)
+                    },
+                    onRemoveTrack = { idx ->
+                        viewModel.removePlaylistItem(idx)
+                    },
+                    onSaveNamedPlaylist = { name ->
+                        viewModel.saveNamedPlaylist(name)
+                    },
+                    onLoadNamedPlaylist = { name ->
+                        viewModel.loadNamedPlaylist(name)
+                    },
+                    onDeleteNamedPlaylist = { name ->
+                        viewModel.deleteNamedPlaylist(name)
+                    },
+                    onRescan = {
+                        viewModel.rescanLibrary()
                     }
                 )
             }
@@ -729,25 +764,38 @@ fun HelpGuideModalSheet(
 fun PlaylistModalSheet(
     uiState: PlayerUiState,
     onClose: () -> Unit,
-    onSelectTrack: (Int) -> Unit
+    onSelectTrack: (Int) -> Unit,
+    onPickFiles: () -> Unit,
+    onMoveTrack: (Int, Int) -> Unit,
+    onRemoveTrack: (Int) -> Unit,
+    onSaveNamedPlaylist: (String) -> Unit,
+    onLoadNamedPlaylist: (String) -> Unit,
+    onDeleteNamedPlaylist: (String) -> Unit,
+    onRescan: () -> Unit
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var showLoadMenu by remember { mutableStateOf(false) }
+    var playlistNameInput by remember { mutableStateOf("") }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f))
+            .background(Color.Black.copy(alpha = 0.75f))
             .clickable { onClose() },
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.7f)
+                .fillMaxHeight(0.78f)
                 .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .background(VinylDarkGray)
                 .border(1.dp, VinylBorder, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                 .clickable(enabled = false) {}
                 .padding(12.dp)
         ) {
+            // Header Row with Title and Action Toolbar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -757,27 +805,151 @@ fun PlaylistModalSheet(
                     text = "PLAYLIST (${uiState.playlist.size})",
                     style = MaterialTheme.typography.titleSmall.copy(
                         color = GoldAccent,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
                 )
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close Playlist",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 1. Add Track from File Picker (SAF)
+                    IconButton(
+                        onClick = onPickFiles,
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Files",
+                            tint = GoldAccent,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    // 2. Save Playlist Dialog
+                    IconButton(
+                        onClick = {
+                            playlistNameInput = "Playlist ${System.currentTimeMillis() % 1000}"
+                            showSaveDialog = true
+                        },
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = "Save Playlist",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    // 3. Saved Playlists Dropdown
+                    Box {
+                        IconButton(
+                            onClick = { showLoadMenu = true },
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = "Saved Playlists",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showLoadMenu,
+                            onDismissRequest = { showLoadMenu = false }
+                        ) {
+                            if (uiState.savedPlaylistNames.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("保存済みリストなし", fontSize = 11.sp, color = TextMuted) },
+                                    onClick = { showLoadMenu = false }
+                                )
+                            } else {
+                                uiState.savedPlaylistNames.forEach { name ->
+                                    DropdownMenuItem(
+                                        text = { Text(name, fontSize = 12.sp, color = TextPrimary) },
+                                        trailingIcon = {
+                                            IconButton(
+                                                onClick = { onDeleteNamedPlaylist(name) },
+                                                modifier = Modifier.size(20.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete",
+                                                    tint = Color(0xFFE57373),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            onLoadNamedPlaylist(name)
+                                            showLoadMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    // 4. Rescan Library
+                    IconButton(
+                        onClick = onRescan,
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Rescan Library",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    // 5. Edit Mode Toggle
+                    IconButton(
+                        onClick = { isEditing = !isEditing },
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(if (isEditing) GoldAccent.copy(alpha = 0.2f) else Color.Transparent)
+                    ) {
+                        Icon(
+                            imageVector = if (isEditing) Icons.Default.Check else Icons.Default.Edit,
+                            contentDescription = if (isEditing) "Done" else "Edit",
+                            tint = if (isEditing) GoldAccent else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    // 6. Close Modal
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close Playlist",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
+            // Playlist Items LazyColumn
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 itemsIndexed(uiState.playlist) { idx, track ->
                     val isCurrent = idx == uiState.currentIndex
@@ -791,11 +963,11 @@ fun PlaylistModalSheet(
                                 if (isCurrent) GoldAccent.copy(alpha = 0.5f) else Color.Transparent,
                                 RoundedCornerShape(6.dp)
                             )
-                            .clickable {
+                            .clickable(enabled = !isEditing) {
                                 onSelectTrack(idx)
                                 onClose()
                             }
-                            .padding(8.dp),
+                            .padding(horizontal = 6.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -803,14 +975,16 @@ fun PlaylistModalSheet(
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = if (isCurrent) GoldAccent else TextMuted
                             ),
-                            modifier = Modifier.width(20.dp)
+                            modifier = Modifier.width(18.dp)
                         )
+
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = track.title,
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = if (isCurrent) GoldAccent else TextPrimary,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 12.sp
                                 ),
                                 maxLines = 1
                             )
@@ -823,16 +997,113 @@ fun PlaylistModalSheet(
                                 maxLines = 1
                             )
                         }
-                        Text(
-                            text = formatDuration(track.durationMs),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = TextMuted,
-                                fontSize = 9.sp
+
+                        if (!isEditing) {
+                            Text(
+                                text = formatDuration(track.durationMs),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = TextMuted,
+                                    fontSize = 9.sp
+                                )
                             )
-                        )
+                        } else {
+                            // Edit Mode Buttons (Move Up, Move Down, Delete)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Move Up
+                                IconButton(
+                                    onClick = { onMoveTrack(idx, idx - 1) },
+                                    enabled = idx > 0,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = "Move Up",
+                                        tint = if (idx > 0) GoldAccent else TextMuted.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+
+                                // Move Down
+                                IconButton(
+                                    onClick = { onMoveTrack(idx, idx + 1) },
+                                    enabled = idx < uiState.playlist.size - 1,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = "Move Down",
+                                        tint = if (idx < uiState.playlist.size - 1) GoldAccent else TextMuted.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+
+                                // Remove Track
+                                IconButton(
+                                    onClick = { onRemoveTrack(idx) },
+                                    enabled = uiState.playlist.size > 1,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = if (uiState.playlist.size > 1) Color(0xFFE57373) else TextMuted.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        // Save Playlist Dialog
+        if (showSaveDialog) {
+            AlertDialog(
+                onDismissRequest = { showSaveDialog = false },
+                title = {
+                    Text(
+                        text = "プレイリストを保存",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            color = GoldAccent,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = "現在の曲順・リストを保存します。",
+                            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondary)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = playlistNameInput,
+                            onValueChange = { playlistNameInput = it },
+                            label = { Text("プレイリスト名") },
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (playlistNameInput.isNotBlank()) {
+                                onSaveNamedPlaylist(playlistNameInput.trim())
+                                showSaveDialog = false
+                            }
+                        }
+                    ) {
+                        Text("保存", color = GoldAccent, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSaveDialog = false }) {
+                        Text("キャンセル", color = TextSecondary)
+                    }
+                },
+                containerColor = VinylDarkGray
+            )
         }
     }
 }

@@ -206,6 +206,30 @@ class PlaybackManager(
         }
     }
 
+    fun addTrack(track: TrackInfo) {
+        val controller = mediaController ?: return
+        controller.addMediaItem(track.toMediaItem())
+        if (!controller.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) || controller.mediaItemCount == 1) {
+            controller.prepare()
+        }
+    }
+
+    fun moveMediaItem(fromIndex: Int, toIndex: Int) {
+        val controller = mediaController ?: return
+        if (fromIndex in 0 until controller.mediaItemCount && toIndex in 0 until controller.mediaItemCount) {
+            controller.moveMediaItem(fromIndex, toIndex)
+            _currentMediaIndex.value = controller.currentMediaItemIndex
+        }
+    }
+
+    fun removeMediaItem(index: Int) {
+        val controller = mediaController ?: return
+        if (index in 0 until controller.mediaItemCount) {
+            controller.removeMediaItem(index)
+            _currentMediaIndex.value = controller.currentMediaItemIndex
+        }
+    }
+
     fun seekTo(positionMs: Long) {
         val controller = mediaController ?: return
         controller.seekTo(positionMs)

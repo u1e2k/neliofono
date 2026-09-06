@@ -123,4 +123,46 @@ class AudioScanner(private val context: Context) {
 
         trackList
     }
+
+    suspend fun createTrackFromUri(uri: Uri): TrackInfo? = withContext(Dispatchers.IO) {
+        try {
+            // Persist URI permission if granted
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(context, uri)
+
+            val title = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                ?: uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.')
+                ?: "Audio Track"
+            val artist = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                ?: "Unknown Artist"
+            val album = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                ?: "Local Import"
+            val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+            val durationMs = durationStr?.toLongOrNull() ?: 0L
+
+            retriever.release()
+
+            val palette = presetPalettes[(uri.hashCode().and(0x7FFFFFFF)) % presetPalettes.size]
+
+            TrackInfo(
+                id = "custom_${System.currentTimeMillis()}_${uri.hashCode()}",
+                title = title,
+                artist = artist,
+                album = album,
+                durationMs = durationMs,
+                mediaUri = uri,
+                defaultPalette = palette
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }

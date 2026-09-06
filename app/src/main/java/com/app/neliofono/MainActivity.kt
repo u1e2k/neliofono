@@ -44,6 +44,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            playerViewModel.addTracksFromUris(uris)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -51,7 +59,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NeliofonoTheme {
-                NeliofonoPlayerScreen(viewModel = playerViewModel)
+                NeliofonoPlayerScreen(
+                    viewModel = playerViewModel,
+                    onPickFiles = {
+                        filePickerLauncher.launch(arrayOf("audio/*", "application/ogg"))
+                    }
+                )
             }
         }
     }

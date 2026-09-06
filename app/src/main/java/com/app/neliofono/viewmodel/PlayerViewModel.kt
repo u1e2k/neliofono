@@ -1,10 +1,12 @@
 package com.app.neliofono.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.app.neliofono.data.AudioScanner
+import com.app.neliofono.data.PlaylistRepository
 import com.app.neliofono.model.KeyLogEntry
 import com.app.neliofono.model.PlayerAction
 import com.app.neliofono.model.RepeatMode
@@ -31,6 +33,7 @@ data class PlayerUiState(
     val isPlaylistViewOpen: Boolean = false,
     val isHelpModalOpen: Boolean = false,
     val isLocalAudioLoaded: Boolean = false,
+    val savedPlaylistNames: List<String> = emptyList(),
     val recentKeyLogs: List<KeyLogEntry> = emptyList(),
     val latestKeyAction: String? = null
 )
@@ -98,6 +101,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     )
 
     private val audioScanner = AudioScanner(application)
+    private val playlistRepository = PlaylistRepository(application)
     private val playbackManager = PlaybackManager(application, viewModelScope)
 
     private val _uiState = MutableStateFlow(
@@ -117,7 +121,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     init {
         playbackManager.connect()
         observePlaybackManager()
-        loadLocalAudio()
+        loadInitialPlaylist()
+        refreshSavedPlaylists()
     }
 
     private fun observePlaybackManager() {
@@ -145,6 +150,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         state
                     }
                 }
+                saveCurrentQueueAuto()
             }
         }
 
@@ -174,6 +180,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun loadInitialPlaylist() {
+        viewModelScope.launch {
+            val savedQueue = playlistRepository.loadCurrentQueue()
+            if (savedQueue != null && savedQueue.first.isNotEmpty()) {
+                val (tracks, savedIdx) = savedQueue
+                val validIdx = savedIdx.coerceIn(0, tracks.size - 1)
+                _uiState.update { state ->
+                    state.copy(
+                        playlist = tracks,
+                        currentTrack = tracks[validIdx],
+                        currentIndex = validIdx,
+                        isLocalAudioLoaded = true
+                    )
+                }
+                if (playbackManager.isConnected.value) {
+                    playbackManager.setPlaylist(tracks, startIndex = validIdx, playWhenReady = false)
+                }
+            } else {
+                loadLocalAudio()
+            }
+        }
+    }
+
     fun loadLocalAudio() {
         viewModelScope.launch {
             val scanned = audioScanner.scanAudioFiles()
@@ -190,6 +219,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (playbackManager.isConnected.value) {
                     playbackManager.setPlaylist(scanned, startIndex = 0, playWhenReady = false)
                 }
+                saveCurrentQueueAuto()
             } else {
                 _uiState.update { state ->
                     state.copy(
@@ -199,6 +229,146 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         isLocalAudioLoaded = false
                     )
                 }
+            }
+        }
+    }
+
+    fun rescanLibrary() {
+        loadLocalAudio()
+    }
+
+    fun addTracksFromUris(uris: List<Uri>) {
+        viewModelScope.launch {
+            val newTracks = mutableListOf<TrackInfo>()
+            for (uri in uris) {
+                val track = audioScanner.createTrackFromUri(uri)
+                if (track != null) {
+                    newTracks.add(track)
+                }
+            }
+
+            if (newTracks.isNotEmpty()) {
+                _uiState.update { state ->
+                    val updatedList = state.playlist + newTracks
+                    state.copy(
+                        playlist = updatedList,
+                        isLocalAudioLoaded = true
+                    )
+                }
+                if (playbackManager.isConnected.value) {
+                    for (track in newTracks) {
+                        playbackManager.addTrack(track)
+                    }
+                }
+                saveCurrentQueueAuto()
+            }
+        }
+    }
+
+    fun movePlaylistItem(fromIndex: Int, toIndex: Int) {
+        val currentPlaylist = _uiState.value.playlist.toMutableList()
+        if (fromIndex in currentPlaylist.indices && toIndex in currentPlaylist.indices && fromIndex != toIndex) {
+            val item = currentPlaylist.removeAt(fromIndex)
+            currentPlaylist.add(toIndex, item)
+
+            val currentIdx = _uiState.value.currentIndex
+            val newCurrentIdx = when {
+                currentIdx == fromIndex -> toIndex
+                fromIndex < currentIdx && toIndex >= currentIdx -> currentIdx - 1
+                fromIndex > currentIdx && toIndex <= currentIdx -> currentIdx + 1
+                else -> currentIdx
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    playlist = currentPlaylist,
+                    currentIndex = newCurrentIdx,
+                    currentTrack = currentPlaylist[newCurrentIdx]
+                )
+            }
+
+            if (playbackManager.isConnected.value && _uiState.value.isLocalAudioLoaded) {
+                playbackManager.moveMediaItem(fromIndex, toIndex)
+            }
+            saveCurrentQueueAuto()
+        }
+    }
+
+    fun removePlaylistItem(index: Int) {
+        val currentPlaylist = _uiState.value.playlist.toMutableList()
+        if (index in currentPlaylist.indices && currentPlaylist.size > 1) {
+            currentPlaylist.removeAt(index)
+
+            val currentIdx = _uiState.value.currentIndex
+            val newCurrentIdx = when {
+                currentIdx == index -> currentIdx.coerceAtMost(currentPlaylist.size - 1)
+                currentIdx > index -> currentIdx - 1
+                else -> currentIdx
+            }
+
+            _uiState.update { state ->
+                state.copy(
+                    playlist = currentPlaylist,
+                    currentIndex = newCurrentIdx,
+                    currentTrack = currentPlaylist[newCurrentIdx]
+                )
+            }
+
+            if (playbackManager.isConnected.value && _uiState.value.isLocalAudioLoaded) {
+                playbackManager.removeMediaItem(index)
+            }
+            saveCurrentQueueAuto()
+        }
+    }
+
+    fun saveNamedPlaylist(name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            playlistRepository.saveNamedPlaylist(name, _uiState.value.playlist)
+            refreshSavedPlaylists()
+        }
+    }
+
+    fun loadNamedPlaylist(name: String) {
+        viewModelScope.launch {
+            val tracks = playlistRepository.loadNamedPlaylist(name)
+            if (tracks != null && tracks.isNotEmpty()) {
+                _uiState.update { state ->
+                    state.copy(
+                        playlist = tracks,
+                        currentTrack = tracks[0],
+                        currentIndex = 0,
+                        isLocalAudioLoaded = true,
+                        currentPositionMs = 0L
+                    )
+                }
+                if (playbackManager.isConnected.value) {
+                    playbackManager.setPlaylist(tracks, startIndex = 0, playWhenReady = _uiState.value.isPlaying)
+                }
+                saveCurrentQueueAuto()
+            }
+        }
+    }
+
+    fun deleteNamedPlaylist(name: String) {
+        viewModelScope.launch {
+            playlistRepository.deleteNamedPlaylist(name)
+            refreshSavedPlaylists()
+        }
+    }
+
+    fun refreshSavedPlaylists() {
+        viewModelScope.launch {
+            val names = playlistRepository.getSavedPlaylistNames()
+            _uiState.update { it.copy(savedPlaylistNames = names) }
+        }
+    }
+
+    private fun saveCurrentQueueAuto() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.isLocalAudioLoaded && state.playlist.isNotEmpty()) {
+                playlistRepository.saveCurrentQueue(state.playlist, state.currentIndex)
             }
         }
     }
@@ -286,6 +456,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
             }
+            saveCurrentQueueAuto()
         }
     }
 
